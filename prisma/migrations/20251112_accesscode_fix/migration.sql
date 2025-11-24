@@ -1,0 +1,4 @@
+-- AlterTable
+ALTER TABLE `AccessCode` ADD COLUMN `maxUses` INTEGER NULL,
+    ADD COLUMN `usedCount` INTEGER NOT NULL DEFAULT 0;
+

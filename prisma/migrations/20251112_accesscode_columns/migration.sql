@@ -1,0 +1,5 @@
+ALTER TABLE `AccessCode`
+--   ADD COLUMN `role` VARCHAR(191) NOT NULL DEFAULT 'viewer',
+--   ADD COLUMN `expiresAt` DATETIME(3) NULL,
+  ADD COLUMN `maxUses` INT NULL,
+  ADD COLUMN `usedCount` INT NOT NULL DEFAULT 0;

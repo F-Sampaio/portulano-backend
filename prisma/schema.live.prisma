@@ -1,0 +1,134 @@
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+model AccessCode {
+  id        String    @id
+  code      String    @unique
+  tripId    String
+  role      String
+  expiresAt DateTime?
+  createdAt DateTime  @default(now())
+  Trip      Trip      @relation(fields: [tripId], references: [id])
+
+  @@index([tripId], map: "AccessCode_tripId_fkey")
+}
+
+model Attachment {
+  id           String   @id
+  tripId       String?
+  dayId        String?
+  uploadedById String?
+  url          String
+  filename     String?
+  mimeType     String?
+  note         String?
+  createdAt    DateTime @default(now())
+  Day          Day?     @relation(fields: [dayId], references: [id])
+  Trip         Trip?    @relation(fields: [tripId], references: [id])
+  User         User?    @relation(fields: [uploadedById], references: [id])
+
+  @@index([dayId], map: "Attachment_dayId_fkey")
+  @@index([tripId], map: "Attachment_tripId_fkey")
+  @@index([uploadedById], map: "Attachment_uploadedById_fkey")
+}
+
+model CheckItem {
+  id        String   @id
+  tripId    String
+  label     String
+  done      Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime
+  Trip      Trip     @relation(fields: [tripId], references: [id])
+
+  @@index([tripId], map: "CheckItem_tripId_fkey")
+}
+
+model Day {
+  id         String       @id
+  tripId     String
+  title      String?
+  from       String?
+  to         String?
+  distanceKm Float?
+  eta        String?
+  notes      String?
+  order      Int
+  createdAt  DateTime     @default(now())
+  updatedAt  DateTime
+  Attachment Attachment[]
+  Trip       Trip         @relation(fields: [tripId], references: [id])
+  Segment    Segment[]
+
+  @@index([tripId], map: "Day_tripId_fkey")
+}
+
+model Segment {
+  id         String   @id
+  dayId      String
+  from       String
+  to         String
+  distanceKm Float?
+  eta        String?
+  order      Int
+  notes      String?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime
+  Day        Day      @relation(fields: [dayId], references: [id])
+
+  @@index([dayId], map: "Segment_dayId_fkey")
+}
+
+model Trip {
+  id          String       @id
+  title       String
+  description String?
+  status      Trip_status  @default(ideia)
+  startDate   DateTime?
+  endDate     DateTime?
+  createdById String
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime
+  AccessCode  AccessCode[]
+  Attachment  Attachment[]
+  CheckItem   CheckItem[]
+  Day         Day[]
+  User        User         @relation(fields: [createdById], references: [id])
+  TripMember  TripMember[]
+
+  @@index([createdById], map: "Trip_createdById_fkey")
+}
+
+model TripMember {
+  id        String   @id
+  tripId    String
+  userId    String
+  role      String
+  createdAt DateTime @default(now())
+  Trip      Trip     @relation(fields: [tripId], references: [id])
+  User      User     @relation(fields: [userId], references: [id])
+
+  @@unique([tripId, userId])
+  @@index([userId], map: "TripMember_userId_fkey")
+}
+
+model User {
+  id           String       @id
+  email        String       @unique
+  passwordHash String
+  name         String?
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime
+  Attachment   Attachment[]
+  Trip         Trip[]
+  TripMember   TripMember[]
+}
+
+enum Trip_status {
+  ideia
+  planejada
+  em_andamento
+  concluida
+}
