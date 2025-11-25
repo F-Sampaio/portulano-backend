@@ -1,4 +1,5 @@
 import { prisma } from '../prisma.js'
+import PDFDocument from 'pdfkit'
 
 
 function parseDate(value) {
@@ -16,6 +17,63 @@ function parseDate(value) {
   if (Number.isNaN(d.getTime())) return null
   return d
 }
+
+function getDayDescription(notes) {
+  if (!notes) return ''
+  try {
+    const parsed = JSON.parse(notes)
+    return parsed.description || ''
+  } catch (err) {
+    return typeof notes === 'string' ? notes : ''
+  }
+}
+
+function writeTripHeader(doc, trip) {
+  doc.fontSize(18).text(trip.title || 'Viagem', { align: 'center' })
+  doc.moveDown()
+  const start = trip.startDate
+    ? new Date(trip.startDate).toLocaleDateString('pt-BR')
+    : '—'
+  doc.fontSize(12).text(`Início: ${start}`)
+  doc.text(`Status: ${trip.status}`)
+  doc.moveDown()
+  if (trip.description) {
+    doc.text(trip.description)
+    doc.moveDown()
+  }
+}
+
+function writeTripMembers(doc, trip) {
+  doc.fontSize(14).text('Participantes:')
+  trip.members.forEach((m) => {
+    const roleLabel = m.role === 'admin' ? 'Administrador' : 'Viewer'
+    const name = m.user?.name || m.user?.email || m.userId
+    doc.fontSize(12).text(`- ${name} (${roleLabel})`)
+  })
+  doc.moveDown()
+}
+
+function writeTripDays(doc, trip) {
+  doc.fontSize(14).text('Dias da viagem:')
+  trip.days.forEach((d, idx) => {
+    doc.moveDown(0.5)
+    doc.fontSize(12).text(`${idx + 1}. ${d.title || 'Dia'}`)
+    if (d.from || d.to) {
+      doc.text(`De: ${d.from || '—'} · Para: ${d.to || '—'}`)
+    }
+    if (d.distanceKm != null) doc.text(`Distância: ${d.distanceKm} km`)
+    if (d.eta) doc.text(`ETA: ${d.eta}`)
+    const desc = getDayDescription(d.notes)
+    if (desc) doc.text(desc)
+  })
+}
+
+function buildTripPdf(doc, trip) {
+  writeTripHeader(doc, trip)
+  writeTripMembers(doc, trip)
+  writeTripDays(doc, trip)
+}
+
 
 
 // GET /trips
@@ -598,6 +656,40 @@ export async function deleteTrip(req, res) {
     return res.status(500).json({ error: 'INTERNAL_ERROR', detail: err.message })
   }
 }
+
+export async function exportTripPdf(req, res) {
+  try {
+    const userId = req.userId ?? 1; const { tripId } = req.params
+    const trip = await prisma.trip.findFirst({
+      where: {
+        id: tripId,
+        OR: [
+          { createdById: String(userId) },
+          { members: { some: { userId: String(userId) } } },
+        ],
+      },
+      include: {
+        checklist: { orderBy: { createdAt: 'asc' } },
+        days: { orderBy: { order: 'asc' } },
+        members: { include: { user: true } },
+      },
+    })
+    if (!trip) return res.status(404).json({ error: 'TRIP_NOT_FOUND' })
+    const doc = new PDFDocument({ margin: 50 })
+    res.setHeader('Content-Type', 'application/pdf')
+    res.setHeader(
+      'Content-Disposition',
+      `inline; filename="viagem-${trip.title || 'trip'}.pdf"`,
+    )
+    doc.pipe(res); buildTripPdf(doc, trip); doc.end()
+  } catch (err) {
+    console.error('exportTripPdf error', err)
+    return res
+      .status(500)
+      .json({ error: 'EXPORT_TRIP_FAILED', detail: err.message })
+  }
+}
+
 
 
 

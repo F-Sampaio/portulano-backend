@@ -15,6 +15,7 @@ import {
   createInvite,
   joinTripByCode,
   deleteTrip,
+  exportTripPdf,
 } from '../controllers/tripController.js'
 
 const router = Router()
@@ -41,5 +42,8 @@ router.post('/:tripId/invites', createInvite)
 router.post('/join', joinTripByCode)
 
 router.delete('/:tripId', deleteTrip)
+
+router.get('/:tripId/export', exportTripPdf)
+
 
 export default router
